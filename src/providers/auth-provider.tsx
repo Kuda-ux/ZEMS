@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { supabase } from "@/lib/supabase/client";
+import { demoUsers } from "@/lib/mock-data";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -21,22 +22,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, _password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
+      // Try Supabase first
       const { data, error } = await supabase
         .from("users")
         .select("*")
         .eq("email", email)
         .single();
-      if (error || !data) {
+      if (!error && data) {
+        setUser(data as UserProfile);
         setIsLoading(false);
-        return false;
+        return true;
       }
-      setUser(data as UserProfile);
+    } catch {
+      // Supabase unavailable — fall through to demo users
+    }
+    // Fallback to local demo users
+    const demo = demoUsers.find((u) => u.email === email);
+    if (demo) {
+      setUser(demo);
       setIsLoading(false);
       return true;
-    } catch {
-      setIsLoading(false);
-      return false;
     }
+    setIsLoading(false);
+    return false;
   }, []);
 
   const logout = useCallback(() => {
