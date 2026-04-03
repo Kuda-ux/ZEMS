@@ -10,14 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getDashboardStats, getPayments, getInvoices } from "@/lib/supabase/queries";
 import type { DashboardStats, Payment, Invoice } from "@/lib/types";
 
-const COLORS = ["#166534", "#CA8A04", "#DC2626", "#2563eb"];
-
-const paymentMethods = [
-  { name: "EcoCash", value: 8500 },
-  { name: "Cash", value: 5200 },
-  { name: "Bank Transfer", value: 3800 },
-  { name: "BEAM", value: 2100 },
-];
+const COLORS = ["#166534", "#CA8A04", "#DC2626", "#2563eb", "#7c3aed", "#0891b2"];
 
 const defaultStats: DashboardStats = { totalStudents: 0, totalStaff: 0, attendanceRate: 0, feesCollected: 0, feesOutstanding: 0, enrollmentTrend: [], attendanceTrend: [], feeCollection: [], genderDistribution: [], gradeDistribution: [] };
 
@@ -25,12 +18,14 @@ export function BursarDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>(defaultStats);
   const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
   const [overdueInvoices, setOverdueInvoices] = useState<Invoice[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
       const [s, p, inv] = await Promise.all([getDashboardStats(), getPayments(), getInvoices()]);
       setStats(s);
+      setAllPayments(p);
       setRecentPayments(p.slice(0, 6));
       setOverdueInvoices(inv.filter((i) => i.status === "pending" || i.status === "partial").slice(0, 5));
     } catch (e) { console.error(e); }
@@ -45,10 +40,10 @@ export function BursarDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Collected" value={`$${stats.feesCollected.toLocaleString()}`} change="+$3,200 this week" changeType="positive" icon={Wallet} iconColor="text-emerald-700" iconBg="bg-emerald-100" />
-        <StatCard title="Outstanding" value={`$${stats.feesOutstanding.toLocaleString()}`} change="24 students" changeType="negative" icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-100" />
-        <StatCard title="Collection Rate" value="73%" change="+5% from last month" changeType="positive" icon={TrendingUp} iconColor="text-blue-700" iconBg="bg-blue-100" />
-        <StatCard title="Payments Today" value={4} change="$1,250 received" changeType="positive" icon={CreditCard} iconColor="text-purple-700" iconBg="bg-purple-100" />
+        <StatCard title="Total Collected" value={`$${stats.feesCollected.toLocaleString()}`} change={`${allPayments.length} payments`} changeType="positive" icon={Wallet} iconColor="text-emerald-700" iconBg="bg-emerald-100" />
+        <StatCard title="Outstanding" value={`$${stats.feesOutstanding.toLocaleString()}`} change={`${overdueInvoices.length} accounts`} changeType="negative" icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-100" />
+        <StatCard title="Collection Rate" value={`${stats.feesCollected + stats.feesOutstanding > 0 ? Math.round((stats.feesCollected / (stats.feesCollected + stats.feesOutstanding)) * 100) : 0}%`} change="Of total fees" changeType="positive" icon={TrendingUp} iconColor="text-blue-700" iconBg="bg-blue-100" />
+        <StatCard title="Payments" value={allPayments.length} change={`$${allPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()} total`} changeType="positive" icon={CreditCard} iconColor="text-purple-700" iconBg="bg-purple-100" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -84,8 +79,12 @@ export function BursarDashboard() {
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={paymentMethods} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value" nameKey="name" label={({ name, value }: { name?: string; value?: number }) => `${name}: $${value}`}>
-                    {paymentMethods.map((_, idx) => (<Cell key={idx} fill={COLORS[idx % COLORS.length]} />))}
+                  <Pie data={(() => {
+                    const methods: Record<string, number> = {};
+                    for (const p of allPayments) { methods[p.payment_method] = (methods[p.payment_method] || 0) + Number(p.amount); }
+                    return Object.entries(methods).map(([name, value]) => ({ name, value }));
+                  })()} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value" nameKey="name" label={({ name, value }: { name?: string; value?: number }) => `${name}: $${value}`}>
+                    {Object.keys(allPayments.reduce((acc, p) => { acc[p.payment_method] = true; return acc; }, {} as Record<string, boolean>)).map((_, idx) => (<Cell key={idx} fill={COLORS[idx % COLORS.length]} />))}
                   </Pie>
                   <Legend />
                 </PieChart>

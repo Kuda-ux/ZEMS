@@ -1,5 +1,9 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
+import { getStaff } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
+import type { StaffMember } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,36 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, UserCheck, Briefcase, GraduationCap, Plus, Search, Mail, Phone } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
-
-interface StaffMember {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  position: string;
-  department: string;
-  staffType: "teaching" | "non_teaching" | "administrative";
-  qualification: string;
-  dateJoined: string;
-  status: "active" | "on_leave" | "resigned";
-}
-
-const demoStaff: StaffMember[] = [
-  { id: "st1", name: "Tendai Moyo", email: "admin@zems.gov.zw", phone: "+263 77 123 4567", position: "Head Teacher", department: "Administration", staffType: "administrative", qualification: "M.Ed Administration", dateJoined: "2018-01-10", status: "active" },
-  { id: "st2", name: "Blessing Ncube", email: "b.ncube@school.co.zw", phone: "+263 73 345 6789", position: "Senior Teacher", department: "Sciences", staffType: "teaching", qualification: "B.Ed Science", dateJoined: "2019-05-15", status: "active" },
-  { id: "st3", name: "Farai Chirwa", email: "f.chirwa@school.co.zw", phone: "+263 71 234 5678", position: "Bursar", department: "Finance", staffType: "administrative", qualification: "B.Com Accounting", dateJoined: "2020-01-06", status: "active" },
-  { id: "st4", name: "Grace Maposa", email: "g.maposa@school.co.zw", phone: "+263 77 456 1234", position: "English Teacher", department: "Languages", staffType: "teaching", qualification: "B.A English", dateJoined: "2021-01-11", status: "active" },
-  { id: "st5", name: "Simbarashe Dube", email: "s.dube@school.co.zw", phone: "+263 71 567 8901", position: "Mathematics Teacher", department: "Mathematics", staffType: "teaching", qualification: "B.Sc Mathematics", dateJoined: "2020-05-04", status: "active" },
-  { id: "st6", name: "Rumbidzai Gumbo", email: "r.gumbo@school.co.zw", phone: "+263 73 678 2345", position: "History Teacher", department: "Humanities", staffType: "teaching", qualification: "B.Ed History", dateJoined: "2019-09-02", status: "active" },
-  { id: "st7", name: "Tafadzwa Phiri", email: "t.phiri@school.co.zw", phone: "+263 77 789 3456", position: "Sports Director", department: "Sports & Culture", staffType: "teaching", qualification: "Dip. Physical Education", dateJoined: "2022-01-10", status: "active" },
-  { id: "st8", name: "Nyasha Banda", email: "n.banda@school.co.zw", phone: "+263 71 890 4567", position: "ICT Teacher", department: "Technology", staffType: "teaching", qualification: "B.Sc Computer Science", dateJoined: "2023-01-09", status: "active" },
-  { id: "st9", name: "Chiedza Zvobgo", email: "c.zvobgo@school.co.zw", phone: "+263 73 901 5678", position: "Shona Teacher", department: "Languages", staffType: "teaching", qualification: "B.A Shona", dateJoined: "2021-05-03", status: "on_leave" },
-  { id: "st10", name: "Prosper Mhaka", email: "p.mhaka@school.co.zw", phone: "+263 77 012 6789", position: "Lab Technician", department: "Sciences", staffType: "non_teaching", qualification: "Dip. Laboratory Science", dateJoined: "2022-09-05", status: "active" },
-  { id: "st11", name: "Fortune Marufu", email: "f.marufu@school.co.zw", phone: "+263 71 123 7890", position: "Secretary", department: "Administration", staffType: "non_teaching", qualification: "Dip. Secretarial Studies", dateJoined: "2020-03-02", status: "active" },
-  { id: "st12", name: "Innocent Gonese", email: "i.gonese@school.co.zw", phone: "+263 73 234 8901", position: "Groundskeeper", department: "Maintenance", staffType: "non_teaching", qualification: "—", dateJoined: "2017-06-12", status: "active" },
-];
 
 const statusColors: Record<string, string> = {
   active: "bg-emerald-100 text-emerald-800",
@@ -55,32 +30,40 @@ const typeColors: Record<string, string> = {
 
 export default function StaffPage() {
   const [search, setSearch] = useState("");
-  const [staff, setStaff] = useState(demoStaff);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [showDialog, setShowDialog] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try { const data = await getStaff(); setStaff(data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = staff.filter(s =>
     search === "" || s.name.toLowerCase().includes(search.toLowerCase()) || s.position.toLowerCase().includes(search.toLowerCase())
   );
 
-  const teaching = staff.filter(s => s.staffType === "teaching").length;
-  const nonTeaching = staff.filter(s => s.staffType === "non_teaching").length;
-  const admin = staff.filter(s => s.staffType === "administrative").length;
+  const teaching = staff.filter(s => s.staff_type === "teaching").length;
+  const nonTeaching = staff.filter(s => s.staff_type === "non_teaching").length;
+  const admin = staff.filter(s => s.staff_type === "administrative").length;
 
-  const handleAdd = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAdd = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const newMember: StaffMember = {
       id: `st${Date.now()}`,
+      school_id: "sch1",
       name: form.get("name") as string,
       email: form.get("email") as string,
       phone: form.get("phone") as string,
       position: form.get("position") as string,
       department: form.get("department") as string,
-      staffType: form.get("staff_type") as StaffMember["staffType"],
+      staff_type: form.get("staff_type") as StaffMember["staff_type"],
       qualification: form.get("qualification") as string,
-      dateJoined: new Date().toISOString().split("T")[0],
+      date_joined: new Date().toISOString().split("T")[0],
       status: "active",
     };
+    const { error } = await supabase.from("staff").insert(newMember);
+    if (error) { toast.error("Failed to add staff", { description: error.message }); return; }
     setStaff([newMember, ...staff]);
     setShowDialog(false);
     toast.success("Staff member added", { description: `${newMember.name} — ${newMember.position}` });
@@ -222,12 +205,12 @@ export default function StaffPage() {
                     <TableCell>{staff.position}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{staff.department}</TableCell>
                     <TableCell>
-                      <Badge className={`text-[10px] ${typeColors[staff.staffType]}`}>{staff.staffType.replace("_", " ")}</Badge>
+                      <Badge className={`text-[10px] ${typeColors[staff.staff_type]}`}>{staff.staff_type.replace("_", " ")}</Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{staff.qualification}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{staff.qualification || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Phone className="w-3 h-3" />{staff.phone}
+                        <Phone className="w-3 h-3" />{staff.phone || '—'}
                       </div>
                     </TableCell>
                     <TableCell>

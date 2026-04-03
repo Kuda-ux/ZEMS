@@ -1,5 +1,12 @@
 -- ZEMS Database Schema - Run in Supabase SQL Editor
 -- Drop existing tables
+DROP TABLE IF EXISTS events CASCADE;
+DROP TABLE IF EXISTS timetable_slots CASCADE;
+DROP TABLE IF EXISTS welfare_records CASCADE;
+DROP TABLE IF EXISTS exam_marks CASCADE;
+DROP TABLE IF EXISTS exams CASCADE;
+DROP TABLE IF EXISTS assets CASCADE;
+DROP TABLE IF EXISTS staff CASCADE;
 DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS discipline_records CASCADE;
 DROP TABLE IF EXISTS announcements CASCADE;
@@ -144,6 +151,91 @@ CREATE TABLE audit_logs (
   user_name TEXT
 );
 
+CREATE TABLE staff (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  position TEXT NOT NULL,
+  department TEXT,
+  staff_type TEXT NOT NULL DEFAULT 'teaching',
+  qualification TEXT,
+  date_joined TEXT,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE assets (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  asset_number TEXT UNIQUE,
+  quantity INTEGER DEFAULT 1,
+  condition TEXT DEFAULT 'good',
+  location TEXT,
+  purchase_date TEXT,
+  value NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE exams (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  exam_type TEXT NOT NULL,
+  term TEXT DEFAULT 'Term 1',
+  max_mark INTEGER DEFAULT 100,
+  status TEXT DEFAULT 'draft',
+  exam_date TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE exam_marks (
+  id TEXT PRIMARY KEY,
+  exam_id TEXT REFERENCES exams(id),
+  student_id TEXT REFERENCES students(id),
+  subject TEXT NOT NULL,
+  mark NUMERIC NOT NULL,
+  student_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE welfare_records (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL,
+  student_id TEXT REFERENCES students(id),
+  student_name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  support TEXT NOT NULL,
+  status TEXT DEFAULT 'active',
+  since TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE timetable_slots (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL,
+  stream_name TEXT NOT NULL,
+  day_of_week TEXT NOT NULL,
+  time_slot TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  teacher_name TEXT,
+  room TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE events (
+  id TEXT PRIMARY KEY,
+  school_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  event_date TEXT NOT NULL,
+  event_type TEXT DEFAULT 'info',
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Disable RLS for development (enable + add policies for production)
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE students DISABLE ROW LEVEL SECURITY;
@@ -154,6 +246,13 @@ ALTER TABLE payments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements DISABLE ROW LEVEL SECURITY;
 ALTER TABLE discipline_records DISABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE staff DISABLE ROW LEVEL SECURITY;
+ALTER TABLE assets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_marks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE welfare_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE timetable_slots DISABLE ROW LEVEL SECURITY;
+ALTER TABLE events DISABLE ROW LEVEL SECURITY;
 
 -- Grant access to anon role
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;

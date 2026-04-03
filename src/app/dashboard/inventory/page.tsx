@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { getAssets } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
+import type { Asset } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,33 +16,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Package, Plus, Search, Monitor, BookOpen, Armchair } from "lucide-react";
 import { toast } from "sonner";
 
-interface Asset {
-  id: string;
-  name: string;
-  category: string;
-  assetNumber: string;
-  quantity: number;
-  condition: string;
-  location: string;
-  purchaseDate: string;
-  value: number;
-}
-
-const demoAssets: Asset[] = [
-  { id: "a1", name: "Student Desks (Double)", category: "Furniture", assetNumber: "FUR-001", quantity: 120, condition: "good", location: "Classrooms", purchaseDate: "2023-01-15", value: 4800 },
-  { id: "a2", name: "Student Chairs", category: "Furniture", assetNumber: "FUR-002", quantity: 240, condition: "good", location: "Classrooms", purchaseDate: "2023-01-15", value: 3600 },
-  { id: "a3", name: "Teacher Desks", category: "Furniture", assetNumber: "FUR-003", quantity: 15, condition: "good", location: "Classrooms", purchaseDate: "2022-06-10", value: 1500 },
-  { id: "a4", name: "Desktop Computers", category: "ICT Equipment", assetNumber: "ICT-001", quantity: 20, condition: "fair", location: "Computer Lab", purchaseDate: "2021-09-01", value: 12000 },
-  { id: "a5", name: "Projector (Epson)", category: "ICT Equipment", assetNumber: "ICT-002", quantity: 3, condition: "good", location: "Science Lab / Hall", purchaseDate: "2024-01-20", value: 2400 },
-  { id: "a6", name: "Science Lab Equipment Set", category: "Laboratory", assetNumber: "LAB-001", quantity: 5, condition: "fair", location: "Science Lab", purchaseDate: "2020-03-15", value: 3500 },
-  { id: "a7", name: "Mathematics Textbooks (Form 1-4)", category: "Textbooks", assetNumber: "TXT-001", quantity: 200, condition: "good", location: "Book Room", purchaseDate: "2025-01-10", value: 2000 },
-  { id: "a8", name: "English Textbooks (Form 1-4)", category: "Textbooks", assetNumber: "TXT-002", quantity: 200, condition: "good", location: "Book Room", purchaseDate: "2025-01-10", value: 2000 },
-  { id: "a9", name: "School Bus (Toyota Coaster)", category: "Vehicle", assetNumber: "VEH-001", quantity: 1, condition: "fair", location: "Parking Lot", purchaseDate: "2019-08-20", value: 25000 },
-  { id: "a10", name: "Photocopier (Canon)", category: "Office Equipment", assetNumber: "OFF-001", quantity: 2, condition: "good", location: "Admin Office", purchaseDate: "2024-06-01", value: 3000 },
-  { id: "a11", name: "First Aid Kit", category: "Medical", assetNumber: "MED-001", quantity: 4, condition: "good", location: "Sick Bay / Staff Room", purchaseDate: "2025-09-01", value: 200 },
-  { id: "a12", name: "Sports Equipment Set", category: "Sports", assetNumber: "SPO-001", quantity: 1, condition: "good", location: "Sports Room", purchaseDate: "2024-03-10", value: 800 },
-];
-
 const conditionColors: Record<string, string> = {
   new: "bg-emerald-100 text-emerald-800",
   good: "bg-blue-100 text-blue-800",
@@ -50,8 +26,13 @@ const conditionColors: Record<string, string> = {
 
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
-  const [assets, setAssets] = useState(demoAssets);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [showDialog, setShowDialog] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try { const data = await getAssets(); setAssets(data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = assets.filter(a =>
     search === "" || a.name.toLowerCase().includes(search.toLowerCase()) || a.category.toLowerCase().includes(search.toLowerCase())
@@ -60,23 +41,26 @@ export default function InventoryPage() {
   const totalValue = assets.reduce((s, a) => s + a.value, 0);
   const categories = [...new Set(assets.map(a => a.category))];
 
-  const handleAdd = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAdd = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const newAsset: Asset = {
       id: `a${Date.now()}`,
+      school_id: "sch1",
       name: form.get("name") as string,
       category: form.get("category") as string,
-      assetNumber: `AST-${String(assets.length + 1).padStart(3, "0")}`,
+      asset_number: `AST-${String(assets.length + 1).padStart(3, "0")}`,
       quantity: parseInt(form.get("quantity") as string),
       condition: form.get("condition") as string,
       location: form.get("location") as string,
-      purchaseDate: form.get("date") as string,
+      purchase_date: form.get("date") as string,
       value: parseFloat(form.get("value") as string),
     };
+    const { error } = await supabase.from("assets").insert(newAsset);
+    if (error) { toast.error("Failed to register asset", { description: error.message }); return; }
     setAssets([newAsset, ...assets]);
     setShowDialog(false);
-    toast.success("Asset registered successfully", { description: `${newAsset.name} — ${newAsset.assetNumber}` });
+    toast.success("Asset registered successfully", { description: `${newAsset.name} — ${newAsset.asset_number}` });
   };
 
   return (
@@ -211,14 +195,14 @@ export default function InventoryPage() {
               <TableBody>
                 {filtered.map((asset) => (
                   <TableRow key={asset.id}>
-                    <TableCell className="font-mono text-xs">{asset.assetNumber}</TableCell>
+                    <TableCell className="font-mono text-xs">{asset.asset_number}</TableCell>
                     <TableCell className="font-medium">{asset.name}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-xs">{asset.category}</Badge></TableCell>
                     <TableCell className="text-center">{asset.quantity}</TableCell>
                     <TableCell>
                       <Badge className={`text-[10px] ${conditionColors[asset.condition] || ""}`}>{asset.condition}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{asset.location}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{asset.location || '—'}</TableCell>
                     <TableCell className="text-right">${asset.value.toLocaleString()}</TableCell>
                   </TableRow>
                 ))}

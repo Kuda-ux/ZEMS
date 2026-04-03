@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getStudents } from "@/lib/supabase/queries";
-import type { Student } from "@/lib/types";
+import { getExams, getExamMarks } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
+import type { ExamEntry, ExamMarkEntry } from "@/lib/types";
 import { SUBJECTS } from "@/lib/constants";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,31 +18,24 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { FileText, Plus, ClipboardList, BarChart3, Award } from "lucide-react";
 import { toast } from "sonner";
 
-interface ExamEntry {
-  id: string;
-  name: string;
-  type: string;
-  term: string;
-  maxMark: number;
-  status: string;
-  date: string;
+interface MarkRow {
+  student: string; english: number; maths: number; science: number; shona: number; total: number; average: number; position: number;
 }
 
-const demoExams: ExamEntry[] = [
-  { id: "e1", name: "Mid-Term Test 1", type: "midterm", term: "Term 1", maxMark: 100, status: "completed", date: "2026-02-20" },
-  { id: "e2", name: "End of Term 1 Exam", type: "endterm", term: "Term 1", maxMark: 100, status: "active", date: "2026-04-01" },
-  { id: "e3", name: "Assignment 1 — English", type: "assignment", term: "Term 1", maxMark: 50, status: "draft", date: "2026-03-15" },
-  { id: "e4", name: "Mock Exam — Form 4", type: "mock", term: "Term 1", maxMark: 100, status: "draft", date: "2026-03-25" },
-];
-
-function buildDemoMarks(students: Student[]) {
-  return students.filter(s => s.status === "active").slice(0, 10).map((s) => {
-    const english = 55 + Math.floor(Math.random() * 40);
-    const maths = 40 + Math.floor(Math.random() * 50);
-    const science = 50 + Math.floor(Math.random() * 45);
-    const shona = 60 + Math.floor(Math.random() * 35);
+function buildMarksFromDB(marks: ExamMarkEntry[]): MarkRow[] {
+  const byStudent: Record<string, Record<string, number>> = {};
+  for (const m of marks) {
+    const name = m.student_name || m.student_id;
+    if (!byStudent[name]) byStudent[name] = {};
+    byStudent[name][m.subject] = Number(m.mark);
+  }
+  return Object.entries(byStudent).map(([student, subjects]) => {
+    const english = subjects["English"] || 0;
+    const maths = subjects["Mathematics"] || 0;
+    const science = subjects["Science"] || 0;
+    const shona = subjects["Shona"] || 0;
     const total = english + maths + science + shona;
-    return { student: `${s.first_name} ${s.last_name}`, english, maths, science, shona, total, average: Math.round(total / 4), position: 0 };
+    return { student, english, maths, science, shona, total, average: Math.round(total / 4), position: 0 };
   }).sort((a, b) => b.total - a.total).map((m, i) => ({ ...m, position: i + 1 }));
 }
 
@@ -54,26 +48,33 @@ const statusColors: Record<string, string> = {
 
 export default function ExamsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [exams, setExams] = useState(demoExams);
-  const [demoMarks, setDemoMarks] = useState<ReturnType<typeof buildDemoMarks>>([]);
+  const [exams, setExams] = useState<ExamEntry[]>([]);
+  const [markRows, setMarkRows] = useState<MarkRow[]>([]);
 
-  const fetchStudents = useCallback(async () => {
-    try { const data = await getStudents(); setDemoMarks(buildDemoMarks(data)); } catch (e) { console.error(e); }
+  const fetchData = useCallback(async () => {
+    try {
+      const [exData, emData] = await Promise.all([getExams(), getExamMarks("e1")]);
+      setExams(exData);
+      setMarkRows(buildMarksFromDB(emData));
+    } catch (e) { console.error(e); }
   }, []);
-  useEffect(() => { fetchStudents(); }, [fetchStudents]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCreateExam = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateExam = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const newExam: ExamEntry = {
       id: `e${Date.now()}`,
+      school_id: "sch1",
       name: form.get("name") as string,
-      type: form.get("type") as string,
+      exam_type: form.get("type") as string,
       term: "Term 1",
-      maxMark: parseInt(form.get("max_mark") as string),
+      max_mark: parseInt(form.get("max_mark") as string),
       status: "draft",
-      date: form.get("date") as string,
+      exam_date: form.get("date") as string,
     };
+    const { error } = await supabase.from("exams").insert(newExam);
+    if (error) { toast.error("Failed to create exam", { description: error.message }); return; }
     setExams([newExam, ...exams]);
     setShowCreateDialog(false);
     toast.success("Exam created successfully");
@@ -185,10 +186,10 @@ export default function ExamsPage() {
                     {exams.map((exam) => (
                       <TableRow key={exam.id}>
                         <TableCell className="font-medium">{exam.name}</TableCell>
-                        <TableCell className="capitalize">{exam.type}</TableCell>
+                        <TableCell className="capitalize">{exam.exam_type}</TableCell>
                         <TableCell>{exam.term}</TableCell>
-                        <TableCell>{exam.maxMark}</TableCell>
-                        <TableCell>{exam.date}</TableCell>
+                        <TableCell>{exam.max_mark}</TableCell>
+                        <TableCell>{exam.exam_date || '—'}</TableCell>
                         <TableCell>
                           <Badge className={statusColors[exam.status]}>{exam.status}</Badge>
                         </TableCell>
@@ -227,7 +228,7 @@ export default function ExamsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {demoMarks.map((m) => (
+                    {markRows.map((m) => (
                       <TableRow key={m.student}>
                         <TableCell className="font-bold text-center">{m.position}</TableCell>
                         <TableCell className="font-medium">{m.student}</TableCell>

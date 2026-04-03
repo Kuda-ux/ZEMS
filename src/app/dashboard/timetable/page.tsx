@@ -1,5 +1,8 @@
 "use client";
 
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { getTimetableSlots } from "@/lib/supabase/queries";
+import type { TimetableSlot } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,30 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar, Plus, Printer } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
-
-interface TimetableSlot {
-  time: string;
-  monday: string;
-  tuesday: string;
-  wednesday: string;
-  thursday: string;
-  friday: string;
-}
-
-const timetableData: TimetableSlot[] = [
-  { time: "07:30 - 08:10", monday: "English", tuesday: "Mathematics", wednesday: "Shona", thursday: "English", friday: "Mathematics" },
-  { time: "08:10 - 08:50", monday: "Mathematics", tuesday: "English", wednesday: "Science", thursday: "History", friday: "English" },
-  { time: "08:50 - 09:30", monday: "Science", tuesday: "Geography", wednesday: "Mathematics", thursday: "Science", friday: "Agriculture" },
-  { time: "09:30 - 09:50", monday: "BREAK", tuesday: "BREAK", wednesday: "BREAK", thursday: "BREAK", friday: "BREAK" },
-  { time: "09:50 - 10:30", monday: "History", tuesday: "Shona", wednesday: "English", thursday: "Commerce", friday: "Geography" },
-  { time: "10:30 - 11:10", monday: "Geography", tuesday: "Science", wednesday: "History", thursday: "Mathematics", friday: "Shona" },
-  { time: "11:10 - 11:50", monday: "Shona", tuesday: "Commerce", wednesday: "Geography", thursday: "Agriculture", friday: "Science" },
-  { time: "11:50 - 12:30", monday: "LUNCH", tuesday: "LUNCH", wednesday: "LUNCH", thursday: "LUNCH", friday: "LUNCH" },
-  { time: "12:30 - 13:10", monday: "Agriculture", tuesday: "Computer Sc.", wednesday: "Commerce", thursday: "Shona", friday: "Computer Sc." },
-  { time: "13:10 - 13:50", monday: "PE / Sports", tuesday: "Agriculture", wednesday: "PE / Sports", thursday: "Computer Sc.", friday: "PE / Sports" },
-];
 
 const subjectColors: Record<string, string> = {
   English: "bg-blue-100 text-blue-800",
@@ -47,8 +27,39 @@ const subjectColors: Record<string, string> = {
   LUNCH: "bg-gray-100 text-gray-500",
 };
 
+interface TimetableRow {
+  time: string; monday: string; tuesday: string; wednesday: string; thursday: string; friday: string;
+}
+
+function buildGrid(slots: TimetableSlot[]): TimetableRow[] {
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+  const timeSlots = [...new Set(slots.map(s => s.time_slot))].sort();
+  return timeSlots.map(time => {
+    const row: TimetableRow = { time, monday: "", tuesday: "", wednesday: "", thursday: "", friday: "" };
+    for (const s of slots.filter(sl => sl.time_slot === time)) {
+      const day = s.day_of_week.toLowerCase() as keyof TimetableRow;
+      if (days.includes(day)) {
+        if (day === "monday") row.monday = s.subject;
+        else if (day === "tuesday") row.tuesday = s.subject;
+        else if (day === "wednesday") row.wednesday = s.subject;
+        else if (day === "thursday") row.thursday = s.subject;
+        else if (day === "friday") row.friday = s.subject;
+      }
+    }
+    return row;
+  });
+}
+
 export default function TimetablePage() {
   const [selectedClass, setSelectedClass] = useState("Form 1 A");
+  const [slots, setSlots] = useState<TimetableSlot[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try { const data = await getTimetableSlots(selectedClass); setSlots(data); } catch (e) { console.error(e); }
+  }, [selectedClass]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const timetableData = useMemo(() => buildGrid(slots), [slots]);
 
   return (
     <div className="space-y-6">
@@ -102,7 +113,7 @@ export default function TimetablePage() {
                     <TableRow key={slot.time} className={isBreak ? "bg-gray-50" : ""}>
                       <TableCell className="font-mono text-xs font-medium">{slot.time}</TableCell>
                       {["monday", "tuesday", "wednesday", "thursday", "friday"].map((day) => {
-                        const subject = slot[day as keyof TimetableSlot];
+                        const subject = slot[day as keyof TimetableRow] || "";
                         const color = subjectColors[subject] || "bg-gray-50 text-gray-700";
                         return (
                           <TableCell key={day} className="text-center p-1.5">

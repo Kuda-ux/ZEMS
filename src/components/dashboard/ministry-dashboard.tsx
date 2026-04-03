@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
+import { getStudents, getStaff } from "@/lib/supabase/queries";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,29 +9,32 @@ import { Building2, GraduationCap, Users, TrendingUp, MapPin, BarChart3 } from "
 import { useAuth } from "@/providers/auth-provider";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-const provinceData = [
-  { province: "Harare", schools: 245, students: 89200, teachers: 4100 },
-  { province: "Bulawayo", schools: 128, students: 45600, teachers: 2200 },
-  { province: "Manicaland", schools: 312, students: 72400, teachers: 3500 },
-  { province: "Midlands", schools: 287, students: 64300, teachers: 3100 },
-  { province: "Masvingo", schools: 256, students: 58700, teachers: 2800 },
-];
-
-const enrollmentByProvince = [
-  { name: "HAR", value: 89200 },
-  { name: "BUL", value: 45600 },
-  { name: "MAN", value: 72400 },
-  { name: "MID", value: 64300 },
-  { name: "MSV", value: 58700 },
-  { name: "MSC", value: 41200 },
-  { name: "MSE", value: 38900 },
-  { name: "MSW", value: 44100 },
-  { name: "MTN", value: 29800 },
-  { name: "MTS", value: 25400 },
-];
-
 export function MinistryDashboard() {
   const { user } = useAuth();
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalTeachers, setTotalTeachers] = useState(0);
+  const [gradeEnrollment, setGradeEnrollment] = useState<{ name: string; value: number }[]>([]);
+  const [gradeTable, setGradeTable] = useState<{ grade: string; students: number; teachers: number }[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [students, staffData] = await Promise.all([getStudents(), getStaff()]);
+      const active = students.filter(s => s.status === "active");
+      const teachers = staffData.filter(s => s.staff_type === "teaching" && s.status === "active");
+      setTotalStudents(active.length);
+      setTotalTeachers(teachers.length);
+      const grades = ["Form 1", "Form 2", "Form 3", "Form 4"];
+      setGradeEnrollment(grades.map(g => ({ name: g, value: active.filter(s => s.grade_name === g).length })));
+      setGradeTable(grades.map(g => ({
+        grade: g,
+        students: active.filter(s => s.grade_name === g).length,
+        teachers: Math.ceil(teachers.length / grades.length),
+      })));
+    } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const teacherRatio = totalTeachers > 0 ? Math.round(totalStudents / totalTeachers) : 0;
 
   return (
     <div className="space-y-6">
@@ -39,22 +44,22 @@ export function MinistryDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Schools" value="2,847" change="+12 this year" changeType="positive" icon={Building2} iconColor="text-emerald-700" iconBg="bg-emerald-100" />
-        <StatCard title="Total Students" value="1.24M" change="+3.2% enrollment" changeType="positive" icon={GraduationCap} iconColor="text-blue-700" iconBg="bg-blue-100" />
-        <StatCard title="Total Teachers" value="52,400" change="1:24 teacher ratio" changeType="neutral" icon={Users} iconColor="text-amber-700" iconBg="bg-amber-100" />
-        <StatCard title="National Pass Rate" value="67.8%" change="+2.1% from 2025" changeType="positive" icon={TrendingUp} iconColor="text-purple-700" iconBg="bg-purple-100" />
+        <StatCard title="Total Schools" value={1} change="Registered on ZEMS" changeType="positive" icon={Building2} iconColor="text-emerald-700" iconBg="bg-emerald-100" />
+        <StatCard title="Total Students" value={totalStudents} change="Active enrollment" changeType="positive" icon={GraduationCap} iconColor="text-blue-700" iconBg="bg-blue-100" />
+        <StatCard title="Total Teachers" value={totalTeachers} change={`1:${teacherRatio} ratio`} changeType="neutral" icon={Users} iconColor="text-amber-700" iconBg="bg-amber-100" />
+        <StatCard title="Staff Total" value={totalTeachers} change="Teaching staff" changeType="positive" icon={TrendingUp} iconColor="text-purple-700" iconBg="bg-purple-100" />
       </div>
 
       <Card className="border-border/60">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-primary" /> Enrollment by Province
+            <BarChart3 className="w-4 h-4 text-primary" /> Enrollment by Grade
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={enrollmentByProvince}>
+              <BarChart data={gradeEnrollment}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
@@ -69,7 +74,7 @@ export function MinistryDashboard() {
       <Card className="border-border/60">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary" /> Provincial Overview
+            <MapPin className="w-4 h-4 text-primary" /> Grade Overview
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -77,22 +82,20 @@ export function MinistryDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/60">
-                  <th className="text-left py-3 px-4 font-semibold text-muted-foreground">Province</th>
-                  <th className="text-right py-3 px-4 font-semibold text-muted-foreground">Schools</th>
+                  <th className="text-left py-3 px-4 font-semibold text-muted-foreground">Grade</th>
                   <th className="text-right py-3 px-4 font-semibold text-muted-foreground">Students</th>
                   <th className="text-right py-3 px-4 font-semibold text-muted-foreground">Teachers</th>
                   <th className="text-right py-3 px-4 font-semibold text-muted-foreground">Ratio</th>
                 </tr>
               </thead>
               <tbody>
-                {provinceData.map((p) => (
-                  <tr key={p.province} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4 font-medium">{p.province}</td>
-                    <td className="py-3 px-4 text-right">{p.schools.toLocaleString()}</td>
+                {gradeTable.map((p) => (
+                  <tr key={p.grade} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                    <td className="py-3 px-4 font-medium">{p.grade}</td>
                     <td className="py-3 px-4 text-right">{p.students.toLocaleString()}</td>
                     <td className="py-3 px-4 text-right">{p.teachers.toLocaleString()}</td>
                     <td className="py-3 px-4 text-right">
-                      <Badge variant="secondary" className="text-xs">1:{Math.round(p.students / p.teachers)}</Badge>
+                      <Badge variant="secondary" className="text-xs">{p.teachers > 0 ? `1:${Math.round(p.students / p.teachers)}` : '—'}</Badge>
                     </td>
                   </tr>
                 ))}

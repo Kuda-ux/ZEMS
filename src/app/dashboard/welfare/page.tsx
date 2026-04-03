@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getStudents } from "@/lib/supabase/queries";
-import type { Student } from "@/lib/types";
+import { getStudents, getWelfareRecords } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
+import type { Student, WelfareRecord } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,21 +16,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Heart, Users, ShieldCheck, Utensils, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-interface WelfareRecord {
-  id: string; student: string; category: string; support: string; status: string; since: string;
-}
-
-const initialRecords: WelfareRecord[] = [
-  { id: "w1", student: "Tatenda Moyo", category: "BEAM", support: "Full tuition coverage", status: "active", since: "2026-01-15" },
-  { id: "w2", student: "Kudzai Dube", category: "OVC", support: "School supplies & uniform", status: "active", since: "2025-09-01" },
-  { id: "w3", student: "Fadzai Sibanda", category: "Feeding", support: "School feeding programme", status: "active", since: "2026-01-15" },
-  { id: "w4", student: "Simbarashe Mpofu", category: "Counseling", support: "Weekly counseling sessions", status: "active", since: "2026-02-01" },
-  { id: "w5", student: "Ruvimbo Nkomo", category: "Disability", support: "Wheelchair access & assisted learning", status: "active", since: "2025-01-10" },
-  { id: "w6", student: "Tapiwanashe Chirwa", category: "OVC", support: "Orphan — grandparent guardian", status: "active", since: "2026-01-15" },
-  { id: "w7", student: "Nokutenda Mutasa", category: "BEAM", support: "Government subsidy — Term 1", status: "active", since: "2026-01-15" },
-  { id: "w8", student: "Panashe Chigumba", category: "Health", support: "Chronic asthma — medication on site", status: "active", since: "2025-05-20" },
-];
-
 const categoryColors: Record<string, string> = {
   BEAM: "bg-amber-100 text-amber-800",
   OVC: "bg-purple-100 text-purple-800",
@@ -41,11 +27,15 @@ const categoryColors: Record<string, string> = {
 
 export default function WelfarePage() {
   const [students, setStudents] = useState<Student[]>([]);
-  const [welfareRecords, setWelfareRecords] = useState<WelfareRecord[]>(initialRecords);
+  const [welfareRecords, setWelfareRecords] = useState<WelfareRecord[]>([]);
   const [showDialog, setShowDialog] = useState(false);
 
   const fetchData = useCallback(async () => {
-    try { const data = await getStudents(); setStudents(data); } catch (e) { console.error(e); }
+    try {
+      const [stuData, wrData] = await Promise.all([getStudents(), getWelfareRecords()]);
+      setStudents(stuData);
+      setWelfareRecords(wrData);
+    } catch (e) { console.error(e); }
   }, []);
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -53,20 +43,25 @@ export default function WelfarePage() {
   const orphanCount = students.filter(s => s.is_orphan && s.status === "active").length;
   const specialNeedsCount = students.filter(s => s.has_special_needs && s.status === "active").length;
 
-  const handleAddRecord = (e: React.FormEvent<HTMLFormElement>) => {
+  const feedingCount = welfareRecords.filter(w => w.category === "Feeding" && w.status === "active").length;
+
+  const handleAddRecord = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const newRecord: WelfareRecord = {
       id: `w${Date.now()}`,
-      student: form.get("student_name") as string,
+      school_id: "sch1",
+      student_name: form.get("student_name") as string,
       category: form.get("category") as string,
       support: form.get("support") as string,
       status: "active",
       since: new Date().toISOString().split("T")[0],
     };
+    const { error } = await supabase.from("welfare_records").insert(newRecord);
+    if (error) { toast.error("Failed to add record", { description: error.message }); return; }
     setWelfareRecords([newRecord, ...welfareRecords]);
     setShowDialog(false);
-    toast.success("Welfare record added", { description: `${newRecord.student} — ${newRecord.category}` });
+    toast.success("Welfare record added", { description: `${newRecord.student_name} — ${newRecord.category}` });
   };
 
   return (
@@ -154,7 +149,7 @@ export default function WelfarePage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Utensils className="w-8 h-8 text-emerald-600" />
             <div>
-              <p className="text-2xl font-bold text-emerald-800">15</p>
+              <p className="text-2xl font-bold text-emerald-800">{feedingCount}</p>
               <p className="text-xs text-emerald-600">Feeding Programme</p>
             </div>
           </CardContent>
@@ -180,12 +175,12 @@ export default function WelfarePage() {
               <TableBody>
                 {welfareRecords.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.student}</TableCell>
+                    <TableCell className="font-medium">{r.student_name}</TableCell>
                     <TableCell>
                       <Badge className={categoryColors[r.category] || "bg-gray-100 text-gray-800"}>{r.category}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{r.support}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-sm">{r.since}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-sm">{r.since || '—'}</TableCell>
                     <TableCell>
                       <Badge className="bg-emerald-100 text-emerald-800">{r.status}</Badge>
                     </TableCell>

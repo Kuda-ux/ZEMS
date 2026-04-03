@@ -285,6 +285,91 @@ export interface DashboardStats {
   gradeDistribution: { grade: string; count: number }[];
 }
 
+export interface StaffMember {
+  id: string;
+  school_id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  position: string;
+  department?: string;
+  staff_type: "teaching" | "non_teaching" | "administrative";
+  qualification?: string;
+  date_joined?: string;
+  status: "active" | "on_leave" | "resigned";
+  created_at?: string;
+}
+
+export interface Asset {
+  id: string;
+  school_id: string;
+  name: string;
+  category: string;
+  asset_number?: string;
+  quantity: number;
+  condition: string;
+  location?: string;
+  purchase_date?: string;
+  value: number;
+  created_at?: string;
+}
+
+export interface ExamEntry {
+  id: string;
+  school_id: string;
+  name: string;
+  exam_type: string;
+  term: string;
+  max_mark: number;
+  status: string;
+  exam_date?: string;
+  created_at?: string;
+}
+
+export interface ExamMarkEntry {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  subject: string;
+  mark: number;
+  student_name?: string;
+  created_at?: string;
+}
+
+export interface WelfareRecord {
+  id: string;
+  school_id: string;
+  student_id?: string;
+  student_name: string;
+  category: string;
+  support: string;
+  status: string;
+  since?: string;
+  created_at?: string;
+}
+
+export interface TimetableSlot {
+  id: string;
+  school_id: string;
+  stream_name: string;
+  day_of_week: string;
+  time_slot: string;
+  subject: string;
+  teacher_name?: string;
+  room?: string;
+  created_at?: string;
+}
+
+export interface SchoolEvent {
+  id: string;
+  school_id: string;
+  title: string;
+  event_date: string;
+  event_type: string;
+  description?: string;
+  created_at?: string;
+}
+
 export interface NavItem {
   title: string;
   href: string;
