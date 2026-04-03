@@ -1,6 +1,8 @@
 "use client";
 
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getStreams } from "@/lib/supabase/queries";
+import type { Stream } from "@/lib/types";
 import { GRADES, SUBJECTS } from "@/lib/constants";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BookOpen, Users, GraduationCap, Plus, Calendar } from "lucide-react";
 
 export default function AcademicsPage() {
-  const streams = mockData.streams;
+  const [streams, setStreams] = useState<Stream[]>([]);
+  const fetchData = useCallback(async () => {
+    try { const data = await getStreams(); setStreams(data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
   const secondaryGrades = GRADES.filter(g => g.school_level === "secondary");
   const secondarySubjects = SUBJECTS.filter(s => s.school_level === "secondary" || s.school_level === "both");
 

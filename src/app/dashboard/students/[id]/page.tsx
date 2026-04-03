@@ -1,7 +1,8 @@
 "use client";
 
-import { use } from "react";
-import { mockData } from "@/lib/mock-data";
+import { use, useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase/client";
+import type { Student, AttendanceRecord, Invoice, DisciplineRecord } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,30 @@ import Link from "next/link";
 
 export default function StudentProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const student = mockData.students.find((s) => s.id === id);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [studentAttendance, setStudentAttendance] = useState<AttendanceRecord[]>([]);
+  const [studentInvoices, setStudentInvoices] = useState<Invoice[]>([]);
+  const [studentDiscipline, setStudentDiscipline] = useState<DisciplineRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [stuRes, attRes, invRes, discRes] = await Promise.all([
+        supabase.from("students").select("*").eq("id", id).single(),
+        supabase.from("attendance_records").select("*").eq("student_id", id),
+        supabase.from("invoices").select("*").eq("student_id", id),
+        supabase.from("discipline_records").select("*").eq("student_id", id),
+      ]);
+      if (stuRes.data) setStudent(stuRes.data as Student);
+      setStudentAttendance((attRes.data || []) as AttendanceRecord[]);
+      setStudentInvoices((invRes.data || []) as Invoice[]);
+      setStudentDiscipline((discRes.data || []) as DisciplineRecord[]);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [id]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading...</p></div>;
 
   if (!student) {
     return (
@@ -22,15 +46,11 @@ export default function StudentProfilePage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const studentAttendance = mockData.attendance.filter((a) => a.student_id === id);
   const presentCount = studentAttendance.filter((a) => a.status === "present" || a.status === "late").length;
   const attendanceRate = studentAttendance.length > 0 ? Math.round((presentCount / studentAttendance.length) * 100) : 0;
 
-  const studentInvoices = mockData.invoices.filter((inv) => inv.student_id === id);
-  const totalFees = studentInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
-  const totalPaid = studentInvoices.reduce((sum, inv) => sum + inv.paid_amount, 0);
-
-  const studentDiscipline = mockData.disciplineRecords.filter((d) => d.student_id === id);
+  const totalFees = studentInvoices.reduce((sum, inv) => sum + Number(inv.total_amount), 0);
+  const totalPaid = studentInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount), 0);
 
   return (
     <div className="space-y-6">

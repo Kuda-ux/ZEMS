@@ -1,6 +1,8 @@
 "use client";
 
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getDashboardStats, getStudents, getInvoices } from "@/lib/supabase/queries";
+import type { DashboardStats, Student, Invoice } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +19,17 @@ import { toast } from "sonner";
 const COLORS = ["#166534", "#CA8A04", "#DC2626", "#2563eb", "#7c3aed"];
 
 export default function ReportsPage() {
-  const stats = mockData.dashboardStats;
-  const students = mockData.students;
-  const invoices = mockData.invoices;
+  const [stats, setStats] = useState<DashboardStats>({ totalStudents: 0, totalStaff: 0, attendanceRate: 0, feesCollected: 0, feesOutstanding: 0, enrollmentTrend: [], attendanceTrend: [], feeCollection: [], genderDistribution: [], gradeDistribution: [] });
+  const [students, setStudents] = useState<Student[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [s, st, inv] = await Promise.all([getDashboardStats(), getStudents(), getInvoices()]);
+      setStats(s); setStudents(st); setInvoices(inv);
+    } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const enrollmentByType = [
     { type: "Government", count: 85 },

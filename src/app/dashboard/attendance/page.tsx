@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { mockData } from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { getStudents, getStreams, getAttendanceRecords } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
+import type { Student, Stream, AttendanceRecord } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,20 +26,31 @@ export default function AttendancePage() {
   const [selectedStream, setSelectedStream] = useState("str1");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [markingData, setMarkingData] = useState<Record<string, AttendanceStatus>>({});
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [streams, setStreams] = useState<Stream[]>([]);
+  const [allAttendance, setAllAttendance] = useState<AttendanceRecord[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [s, st, att] = await Promise.all([getStudents(), getStreams(), getAttendanceRecords()]);
+      setAllStudents(s); setStreams(st); setAllAttendance(att);
+    } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const streamStudents = useMemo(() => {
-    const stream = mockData.streams.find(s => s.id === selectedStream);
+    const stream = streams.find(s => s.id === selectedStream);
     if (!stream) return [];
-    return mockData.students.filter(s => s.status === "active" && s.stream_name === stream.name).slice(0, 30);
-  }, [selectedStream]);
+    return allStudents.filter(s => s.status === "active" && s.stream_name === stream.name).slice(0, 30);
+  }, [selectedStream, streams, allStudents]);
 
   const existingRecords = useMemo(() => {
     const records: Record<string, AttendanceStatus> = {};
-    mockData.attendance
+    allAttendance
       .filter(a => a.date === selectedDate && a.stream_id === selectedStream)
       .forEach(a => { records[a.student_id] = a.status; });
     return records;
-  }, [selectedDate, selectedStream]);
+  }, [selectedDate, selectedStream, allAttendance]);
 
   const getStatus = (studentId: string): AttendanceStatus => {
     return markingData[studentId] || existingRecords[studentId] || "present";
@@ -56,13 +69,26 @@ export default function AttendancePage() {
     setMarkingData(data);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const records = streamStudents.map(s => ({
+      id: `att-${selectedDate}-${s.id}`,
+      school_id: "sch1",
+      student_id: s.id,
+      stream_id: selectedStream,
+      date: selectedDate,
+      status: getStatus(s.id),
+      marked_by: "u4",
+      student_name: `${s.first_name} ${s.last_name}`,
+    }));
+    const { error } = await supabase.from("attendance_records").upsert(records, { onConflict: "id" });
+    if (error) { toast.error("Failed to save", { description: error.message }); return; }
     toast.success("Attendance saved successfully", {
       description: `${streamStudents.length} records saved for ${selectedDate}`,
     });
+    fetchData();
   };
 
-  const todayRecords = mockData.attendance.filter(a => a.date === selectedDate);
+  const todayRecords = allAttendance.filter(a => a.date === selectedDate);
   const todayPresent = todayRecords.filter(a => a.status === "present" || a.status === "late").length;
   const todayAbsent = todayRecords.filter(a => a.status === "absent").length;
   const todayLate = todayRecords.filter(a => a.status === "late").length;
@@ -139,7 +165,7 @@ export default function AttendancePage() {
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockData.streams.map((s) => (
+                    {streams.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -214,7 +240,7 @@ export default function AttendancePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockData.attendance.slice(0, 20).map((record) => {
+                    {allAttendance.slice(0, 20).map((record) => {
                       const config = statusConfig[record.status];
                       return (
                         <TableRow key={record.id}>

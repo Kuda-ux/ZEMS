@@ -4,9 +4,11 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, TrendingUp, AlertTriangle, CreditCard, Receipt, PieChart as PieIcon } from "lucide-react";
-import { mockData } from "@/lib/mock-data";
 import { useAuth } from "@/providers/auth-provider";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { useState, useEffect, useCallback } from "react";
+import { getDashboardStats, getPayments, getInvoices } from "@/lib/supabase/queries";
+import type { DashboardStats, Payment, Invoice } from "@/lib/types";
 
 const COLORS = ["#166534", "#CA8A04", "#DC2626", "#2563eb"];
 
@@ -17,11 +19,23 @@ const paymentMethods = [
   { name: "BEAM", value: 2100 },
 ];
 
+const defaultStats: DashboardStats = { totalStudents: 0, totalStaff: 0, attendanceRate: 0, feesCollected: 0, feesOutstanding: 0, enrollmentTrend: [], attendanceTrend: [], feeCollection: [], genderDistribution: [], gradeDistribution: [] };
+
 export function BursarDashboard() {
   const { user } = useAuth();
-  const stats = mockData.dashboardStats;
-  const recentPayments = mockData.payments.slice(0, 6);
-  const overdueInvoices = mockData.invoices.filter((i) => i.status === "pending" || i.status === "partial").slice(0, 5);
+  const [stats, setStats] = useState<DashboardStats>(defaultStats);
+  const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
+  const [overdueInvoices, setOverdueInvoices] = useState<Invoice[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [s, p, inv] = await Promise.all([getDashboardStats(), getPayments(), getInvoices()]);
+      setStats(s);
+      setRecentPayments(p.slice(0, 6));
+      setOverdueInvoices(inv.filter((i) => i.status === "pending" || i.status === "partial").slice(0, 5));
+    } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
     <div className="space-y-6">

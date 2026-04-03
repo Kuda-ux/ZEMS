@@ -1,6 +1,8 @@
 "use client";
 
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getStudents } from "@/lib/supabase/queries";
+import type { Student } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +31,13 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function WelfarePage() {
-  const students = mockData.students;
+  const [students, setStudents] = useState<Student[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try { const data = await getStudents(); setStudents(data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const beamCount = students.filter(s => s.is_beam_beneficiary && s.status === "active").length;
   const orphanCount = students.filter(s => s.is_orphan && s.status === "active").length;
   const specialNeedsCount = students.filter(s => s.has_special_needs && s.status === "active").length;

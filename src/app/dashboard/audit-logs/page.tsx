@@ -1,6 +1,8 @@
 "use client";
 
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getAuditLogs } from "@/lib/supabase/queries";
+import type { AuditLog } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollText, Search, Download, Filter } from "lucide-react";
-import { useState } from "react";
 
 const actionColors: Record<string, string> = {
   create: "bg-emerald-100 text-emerald-800",
@@ -19,22 +20,17 @@ const actionColors: Record<string, string> = {
   logout: "bg-gray-100 text-gray-800",
 };
 
-const extendedLogs = [
-  ...mockData.auditLogs,
-  { id: "al6", user_id: "u3", school_id: "sch1", action: "create", entity_type: "payment", entity_id: "pay2", created_at: "2026-02-21T08:15:00Z", user_name: "Farai Chirwa" },
-  { id: "al7", user_id: "u4", school_id: "sch1", action: "create", entity_type: "attendance", entity_id: "att-1-stu2", created_at: "2026-02-21T07:30:00Z", user_name: "Blessing Ncube" },
-  { id: "al8", user_id: "u1", school_id: "sch1", action: "update", entity_type: "fee_structure", entity_id: "fs1", created_at: "2026-02-19T14:00:00Z", user_name: "Tendai Moyo" },
-  { id: "al9", user_id: "u1", school_id: "sch1", action: "create", entity_type: "announcement", entity_id: "ann1", created_at: "2026-01-20T08:00:00Z", user_name: "Tendai Moyo" },
-  { id: "al10", user_id: "u4", school_id: "sch1", action: "create", entity_type: "discipline", entity_id: "disc1", created_at: "2026-02-10T11:00:00Z", user_name: "Blessing Ncube" },
-  { id: "al11", user_id: "u3", school_id: "sch1", action: "create", entity_type: "payment", entity_id: "pay3", created_at: "2026-02-18T09:45:00Z", user_name: "Farai Chirwa" },
-  { id: "al12", user_id: "u1", school_id: "sch1", action: "login", entity_type: "session", created_at: "2026-02-22T06:28:00Z", user_name: "Tendai Moyo" },
-].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
 export default function AuditLogsPage() {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
+  const [logs, setLogs] = useState<AuditLog[]>([]);
 
-  const filtered = extendedLogs.filter((log) => {
+  const fetchData = useCallback(async () => {
+    try { const data = await getAuditLogs(); setLogs(data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const filtered = logs.filter((log) => {
     const matchSearch = search === "" ||
       (log.user_name || "").toLowerCase().includes(search.toLowerCase()) ||
       log.entity_type.toLowerCase().includes(search.toLowerCase());
@@ -107,7 +103,7 @@ export default function AuditLogsPage() {
           </div>
 
           <p className="text-xs text-muted-foreground mt-3">
-            Showing {filtered.length} of {extendedLogs.length} records. All actions are logged automatically for accountability.
+            Showing {filtered.length} of {logs.length} records. All actions are logged automatically for accountability.
           </p>
         </CardContent>
       </Card>

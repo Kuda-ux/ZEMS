@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { mockData } from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { getStudents } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,17 @@ export default function StudentsPage() {
   const [genderFilter, setGenderFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [students, setStudents] = useState<Student[]>(mockData.students);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const fetchStudents = useCallback(async () => {
+    try {
+      const data = await getStudents();
+      setStudents(data);
+    } catch (e) { console.error("Failed to load students:", e); }
+    finally { setIsLoadingData(false); }
+  }, []);
+  useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
   const filtered = useMemo(() => {
     return students.filter((s) => {
@@ -58,7 +69,7 @@ export default function StudentsPage() {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  const handleAddStudent = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddStudent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const newStudent: Student = {
@@ -84,6 +95,8 @@ export default function StudentsPage() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    const { error } = await supabase.from("students").insert(newStudent);
+    if (error) { toast.error("Failed to enroll student", { description: error.message }); return; }
     setStudents([newStudent, ...students]);
     setShowAddDialog(false);
     toast.success("Student enrolled successfully", { description: `${newStudent.first_name} ${newStudent.last_name} — ${newStudent.zems_id}` });

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getDisciplineRecords, getStudents } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
 import { INCIDENT_TYPES } from "@/lib/constants";
+import type { Student } from "@/lib/types";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,13 +33,22 @@ const statusColors: Record<string, string> = {
 };
 
 export default function DisciplinePage() {
-  const [records, setRecords] = useState<DisciplineRecord[]>(mockData.disciplineRecords);
+  const [records, setRecords] = useState<DisciplineRecord[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [showDialog, setShowDialog] = useState(false);
 
-  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
+  const fetchData = useCallback(async () => {
+    try {
+      const [d, s] = await Promise.all([getDisciplineRecords(), getStudents()]);
+      setRecords(d); setAllStudents(s);
+    } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const stu = mockData.students.find(s => s.id === form.get("student_id"));
+    const stu = allStudents.find(s => s.id === form.get("student_id"));
     const newRecord: DisciplineRecord = {
       id: `disc${Date.now()}`,
       school_id: "sch1",
@@ -75,7 +86,7 @@ export default function DisciplinePage() {
                 <Select name="student_id" required>
                   <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
                   <SelectContent>
-                    {mockData.students.filter(s => s.status === "active").slice(0, 20).map(s => (
+                    {allStudents.filter(s => s.status === "active").slice(0, 20).map(s => (
                       <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
                     ))}
                   </SelectContent>

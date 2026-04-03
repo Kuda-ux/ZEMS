@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { UserProfile, UserRole } from "@/lib/types";
-import { mockData } from "@/lib/mock-data";
+import { supabase } from "@/lib/supabase/client";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -20,25 +20,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, _password: string): Promise<boolean> => {
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    const found = mockData.users.find((u) => u.email === email);
-    if (found) {
-      setUser(found);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .single();
+      if (error || !data) {
+        setIsLoading(false);
+        return false;
+      }
+      setUser(data as UserProfile);
       setIsLoading(false);
       return true;
+    } catch {
+      setIsLoading(false);
+      return false;
     }
-    setUser(mockData.currentUser);
-    setIsLoading(false);
-    return true;
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
   }, []);
 
-  const switchRole = useCallback((role: UserRole) => {
-    const found = mockData.users.find((u) => u.role === role);
-    if (found) setUser(found);
+  const switchRole = useCallback(async (role: UserRole) => {
+    const { data } = await supabase.from("users").select("*").eq("role", role).limit(1).single();
+    if (data) setUser(data as UserProfile);
     else if (user) setUser({ ...user, role });
   }, [user]);
 

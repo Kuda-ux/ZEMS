@@ -1,10 +1,10 @@
 "use client";
 
-import { mockData } from "@/lib/mock-data";
+import { useCallback, useState, useEffect } from "react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, Users, ClipboardCheck, Wallet, TrendingUp, AlertTriangle, Bell } from "lucide-react";
+import { GraduationCap, Users, ClipboardCheck, Wallet, TrendingUp, AlertTriangle, Bell, Loader2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend,
@@ -14,17 +14,35 @@ import { TeacherDashboard } from "@/components/dashboard/teacher-dashboard";
 import { BursarDashboard } from "@/components/dashboard/bursar-dashboard";
 import { ParentDashboard } from "@/components/dashboard/parent-dashboard";
 import { MinistryDashboard } from "@/components/dashboard/ministry-dashboard";
+import { getDashboardStats, getAnnouncements } from "@/lib/supabase/queries";
+import type { DashboardStats, Announcement } from "@/lib/types";
 
 const COLORS = ["#166534", "#CA8A04", "#DC2626", "#2563eb"];
 
+const defaultStats: DashboardStats = { totalStudents: 0, totalStaff: 0, attendanceRate: 0, feesCollected: 0, feesOutstanding: 0, enrollmentTrend: [], attendanceTrend: [], feeCollection: [], genderDistribution: [], gradeDistribution: [] };
+
 export default function DashboardPage() {
   const { user } = useAuth();
-  const stats = mockData.dashboardStats;
+  const [stats, setStats] = useState<DashboardStats>(defaultStats);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [s, a] = await Promise.all([getDashboardStats(), getAnnouncements()]);
+      setStats(s);
+      setAnnouncements(a);
+    } catch (e) { console.error("Dashboard fetch error:", e); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (user?.role === "teacher") return <TeacherDashboard />;
   if (user?.role === "bursar") return <BursarDashboard />;
   if (user?.role === "parent") return <ParentDashboard />;
   if (user?.role === "ministry_admin" || user?.role === "provincial_admin" || user?.role === "district_admin") return <MinistryDashboard />;
+
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
@@ -198,7 +216,7 @@ export default function DashboardPage() {
 
             <div className="pt-2 border-t">
               <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Announcements</h4>
-              {mockData.announcements.slice(0, 2).map((ann) => (
+              {announcements.slice(0, 2).map((ann) => (
                 <div key={ann.id} className="flex items-center justify-between py-2">
                   <span className="text-sm truncate flex-1 mr-2">{ann.title}</span>
                   <Badge variant={ann.priority === "urgent" ? "destructive" : ann.priority === "high" ? "default" : "secondary"} className="text-[10px] shrink-0">

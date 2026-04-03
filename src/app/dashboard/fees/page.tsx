@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { mockData } from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { getInvoices, getPayments } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +31,17 @@ export default function FeesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [payments, setPayments] = useState<Payment[]>(mockData.payments);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<string>("");
+  const [invoices, setInvoices] = useState<import("@/lib/types").Invoice[]>([]);
 
-  const invoices = mockData.invoices;
+  const fetchData = useCallback(async () => {
+    try {
+      const [inv, pay] = await Promise.all([getInvoices(), getPayments()]);
+      setInvoices(inv); setPayments(pay);
+    } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
   const totalBilled = invoices.reduce((s, i) => s + i.total_amount, 0);
   const totalCollected = invoices.reduce((s, i) => s + i.paid_amount, 0);
   const totalOutstanding = invoices.reduce((s, i) => s + i.balance, 0);

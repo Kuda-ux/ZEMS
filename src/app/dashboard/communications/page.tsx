@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getAnnouncements } from "@/lib/supabase/queries";
+import { supabase } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +38,15 @@ const smsLog = [
 ];
 
 export default function CommunicationsPage() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>(mockData.announcements);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try { const data = await getAnnouncements(); setAnnouncements(data); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
   const [showDialog, setShowDialog] = useState(false);
 
-  const handleCreate = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const newAnn: Announcement = {
@@ -54,6 +60,8 @@ export default function CommunicationsPage() {
       published_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
     };
+    const { error } = await supabase.from("announcements").insert(newAnn);
+    if (error) { toast.error("Failed to publish", { description: error.message }); return; }
     setAnnouncements([newAnn, ...announcements]);
     setShowDialog(false);
     toast.success("Announcement published");

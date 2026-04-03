@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { mockData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react";
+import { getStudents } from "@/lib/supabase/queries";
+import type { Student } from "@/lib/types";
 import { SUBJECTS } from "@/lib/constants";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,20 +34,16 @@ const demoExams: ExamEntry[] = [
   { id: "e4", name: "Mock Exam — Form 4", type: "mock", term: "Term 1", maxMark: 100, status: "draft", date: "2026-03-25" },
 ];
 
-const demoMarks = mockData.students.filter(s => s.status === "active").slice(0, 10).map((s, i) => ({
-  student: `${s.first_name} ${s.last_name}`,
-  english: 55 + Math.floor(Math.random() * 40),
-  maths: 40 + Math.floor(Math.random() * 50),
-  science: 50 + Math.floor(Math.random() * 45),
-  shona: 60 + Math.floor(Math.random() * 35),
-  total: 0,
-  average: 0,
-  position: 0,
-})).map(m => {
-  m.total = m.english + m.maths + m.science + m.shona;
-  m.average = Math.round(m.total / 4);
-  return m;
-}).sort((a, b) => b.total - a.total).map((m, i) => ({ ...m, position: i + 1 }));
+function buildDemoMarks(students: Student[]) {
+  return students.filter(s => s.status === "active").slice(0, 10).map((s) => {
+    const english = 55 + Math.floor(Math.random() * 40);
+    const maths = 40 + Math.floor(Math.random() * 50);
+    const science = 50 + Math.floor(Math.random() * 45);
+    const shona = 60 + Math.floor(Math.random() * 35);
+    const total = english + maths + science + shona;
+    return { student: `${s.first_name} ${s.last_name}`, english, maths, science, shona, total, average: Math.round(total / 4), position: 0 };
+  }).sort((a, b) => b.total - a.total).map((m, i) => ({ ...m, position: i + 1 }));
+}
 
 const statusColors: Record<string, string> = {
   completed: "bg-emerald-100 text-emerald-800",
@@ -58,6 +55,12 @@ const statusColors: Record<string, string> = {
 export default function ExamsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [exams, setExams] = useState(demoExams);
+  const [demoMarks, setDemoMarks] = useState<ReturnType<typeof buildDemoMarks>>([]);
+
+  const fetchStudents = useCallback(async () => {
+    try { const data = await getStudents(); setDemoMarks(buildDemoMarks(data)); } catch (e) { console.error(e); }
+  }, []);
+  useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
   const handleCreateExam = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
