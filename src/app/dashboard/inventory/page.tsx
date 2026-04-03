@@ -76,7 +76,7 @@ export default function InventoryPage() {
     };
     setAssets([newAsset, ...assets]);
     setShowDialog(false);
-    toast.success("Asset registered successfully");
+    toast.success("Asset registered successfully", { description: `${newAsset.name} — ${newAsset.assetNumber}` });
   };
 
   return (
@@ -94,7 +94,7 @@ export default function InventoryPage() {
             <form onSubmit={handleAdd} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Asset Name *</Label>
-                <Input id="name" name="name" required />
+                <Input id="name" name="name" placeholder="e.g. Student Desks (Double)" required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -128,13 +128,13 @@ export default function InventoryPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="value">Value ($) *</Label>
-                  <Input id="value" name="value" type="number" step="0.01" required />
+                  <Input id="value" name="value" type="number" step="0.01" placeholder="e.g. 500" required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
-                  <Input id="location" name="location" />
+                  <Input id="location" name="location" placeholder="e.g. Room 12" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="date">Purchase Date</Label>

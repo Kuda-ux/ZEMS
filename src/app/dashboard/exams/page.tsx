@@ -193,7 +193,9 @@ export default function ExamsPage() {
                           <Badge className={statusColors[exam.status]}>{exam.status}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="outline" size="sm">Enter Marks</Button>
+                          <Button variant="outline" size="sm" onClick={() => {
+                            toast.info(`Opening mark entry for "${exam.name}"`, { description: "Switch to the Mark Sheet tab to enter marks" });
+                          }}>Enter Marks</Button>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -8,12 +8,19 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BookOpen, Users, GraduationCap, Plus, Calendar } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase/client";
 
 export default function AcademicsPage() {
   const [streams, setStreams] = useState<Stream[]>([]);
+  const [showDialog, setShowDialog] = useState(false);
   const fetchData = useCallback(async () => {
     try { const data = await getStreams(); setStreams(data); } catch (e) { console.error(e); }
   }, []);
@@ -21,10 +28,79 @@ export default function AcademicsPage() {
   const secondaryGrades = GRADES.filter(g => g.school_level === "secondary");
   const secondarySubjects = SUBJECTS.filter(s => s.school_level === "secondary" || s.school_level === "both");
 
+  const handleAddClass = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const grade = form.get("grade") as string;
+    const section = form.get("section") as string;
+    const capacity = parseInt(form.get("capacity") as string) || 40;
+    const gradeObj = secondaryGrades.find(g => g.name === grade);
+    const newStream: Stream = {
+      id: `str${Date.now()}`,
+      school_id: "sch1",
+      grade_id: gradeObj?.id || "",
+      academic_year_id: "ay2026",
+      grade_name: grade,
+      name: `${grade} ${section}`,
+      capacity,
+      student_count: 0,
+    };
+    const { error } = await supabase.from("streams").insert(newStream);
+    if (error) { toast.error("Failed to add class", { description: error.message }); return; }
+    setStreams([...streams, newStream]);
+    setShowDialog(false);
+    toast.success("Class added", { description: newStream.name });
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="Academic Structure" description="Manage classes, streams, subjects, and curriculum">
-        <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Class</Button>
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogTrigger render={<Button size="sm" />}>
+            <Plus className="w-4 h-4 mr-2" /> Add Class
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Class Stream</DialogTitle>
+              <DialogDescription>Create a new class stream for a grade level</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddClass} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Grade Level *</Label>
+                <Select name="grade" required>
+                  <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                  <SelectContent>
+                    {secondaryGrades.map(g => (
+                      <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="section">Section *</Label>
+                  <Select name="section" required>
+                    <SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">A</SelectItem>
+                      <SelectItem value="B">B</SelectItem>
+                      <SelectItem value="C">C</SelectItem>
+                      <SelectItem value="D">D</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="capacity">Capacity *</Label>
+                  <Input id="capacity" name="capacity" type="number" defaultValue={40} min={10} max={60} required />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+                <Button type="submit">Add Class</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

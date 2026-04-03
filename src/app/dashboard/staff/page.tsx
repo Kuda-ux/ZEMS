@@ -6,8 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, UserCheck, Briefcase, GraduationCap, Plus, Search, Mail, Phone } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface StaffMember {
   id: string;
@@ -51,19 +55,105 @@ const typeColors: Record<string, string> = {
 
 export default function StaffPage() {
   const [search, setSearch] = useState("");
+  const [staff, setStaff] = useState(demoStaff);
+  const [showDialog, setShowDialog] = useState(false);
 
-  const filtered = demoStaff.filter(s =>
+  const filtered = staff.filter(s =>
     search === "" || s.name.toLowerCase().includes(search.toLowerCase()) || s.position.toLowerCase().includes(search.toLowerCase())
   );
 
-  const teaching = demoStaff.filter(s => s.staffType === "teaching").length;
-  const nonTeaching = demoStaff.filter(s => s.staffType === "non_teaching").length;
-  const admin = demoStaff.filter(s => s.staffType === "administrative").length;
+  const teaching = staff.filter(s => s.staffType === "teaching").length;
+  const nonTeaching = staff.filter(s => s.staffType === "non_teaching").length;
+  const admin = staff.filter(s => s.staffType === "administrative").length;
+
+  const handleAdd = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const newMember: StaffMember = {
+      id: `st${Date.now()}`,
+      name: form.get("name") as string,
+      email: form.get("email") as string,
+      phone: form.get("phone") as string,
+      position: form.get("position") as string,
+      department: form.get("department") as string,
+      staffType: form.get("staff_type") as StaffMember["staffType"],
+      qualification: form.get("qualification") as string,
+      dateJoined: new Date().toISOString().split("T")[0],
+      status: "active",
+    };
+    setStaff([newMember, ...staff]);
+    setShowDialog(false);
+    toast.success("Staff member added", { description: `${newMember.name} — ${newMember.position}` });
+  };
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Staff Management" description={`${demoStaff.length} staff members`}>
-        <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Staff</Button>
+      <PageHeader title="Staff Management" description={`${staff.length} staff members`}>
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogTrigger render={<Button size="sm" />}>
+            <Plus className="w-4 h-4 mr-2" /> Add Staff
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add Staff Member</DialogTitle>
+              <DialogDescription>Register a new staff member</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAdd} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input id="name" name="name" placeholder="e.g. Grace Maposa" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="position">Position *</Label>
+                  <Input id="position" name="position" placeholder="e.g. Mathematics Teacher" required />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input id="email" name="email" type="email" placeholder="name@school.co.zw" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone *</Label>
+                  <Input id="phone" name="phone" placeholder="+263 7X XXX XXXX" required />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Staff Type *</Label>
+                  <Select name="staff_type" required>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="teaching">Teaching</SelectItem>
+                      <SelectItem value="non_teaching">Non-Teaching</SelectItem>
+                      <SelectItem value="administrative">Administrative</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department *</Label>
+                  <Select name="department" required>
+                    <SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger>
+                    <SelectContent>
+                      {["Administration", "Sciences", "Mathematics", "Languages", "Humanities", "Technology", "Finance", "Sports & Culture", "Maintenance"].map(d => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="qualification">Qualification</Label>
+                <Input id="qualification" name="qualification" placeholder="e.g. B.Ed Mathematics" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+                <Button type="submit">Add Staff Member</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </PageHeader>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -71,7 +161,7 @@ export default function StaffPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Users className="w-8 h-8 text-blue-600" />
             <div>
-              <p className="text-2xl font-bold text-blue-800">{demoStaff.length}</p>
+              <p className="text-2xl font-bold text-blue-800">{staff.length}</p>
               <p className="text-xs text-blue-600">Total Staff</p>
             </div>
           </CardContent>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Edit, Printer, User, BookOpen, ClipboardCheck, Wallet, ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 export default function StudentProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -60,10 +61,15 @@ export default function StudentProfilePage({ params }: { params: Promise<{ id: s
             <ArrowLeft className="w-4 h-4 mr-2" /> Back
           </Button>
         </Link>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => {
+          toast.success("Printing student profile", { description: `${student.first_name} ${student.last_name}` });
+          window.print();
+        }}>
           <Printer className="w-4 h-4 mr-2" /> Print
         </Button>
-        <Button size="sm">
+        <Button size="sm" onClick={() => {
+          toast.info("Edit mode", { description: "Student editing coming soon" });
+        }}>
           <Edit className="w-4 h-4 mr-2" /> Edit
         </Button>
       </PageHeader>

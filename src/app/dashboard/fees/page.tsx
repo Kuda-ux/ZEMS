@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Wallet, DollarSign, AlertTriangle, CheckCircle, Plus, Search, Download, Receipt, Printer } from "lucide-react";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { toast } from "sonner";
+import { exportToCSV } from "@/lib/export-utils";
 import type { Payment } from "@/lib/types";
 
 const statusColors: Record<string, string> = {
@@ -33,6 +34,7 @@ export default function FeesPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
   const [invoices, setInvoices] = useState<import("@/lib/types").Invoice[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -57,11 +59,13 @@ export default function FeesPage() {
     });
   }, [invoices, search, statusFilter]);
 
-  const handleRecordPayment = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRecordPayment = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     const form = new FormData(e.currentTarget);
     const inv = invoices.find(i => i.id === selectedInvoice);
-    if (!inv) return;
+    if (!inv) { setSubmitting(false); return; }
 
     const newPayment: Payment = {
       id: `pay${Date.now()}`,
@@ -77,17 +81,26 @@ export default function FeesPage() {
       status: "confirmed",
       student_name: inv.student_name,
     };
+    const { error } = await supabase.from("payments").insert(newPayment);
+    if (error) { toast.error("Failed to record payment", { description: error.message }); setSubmitting(false); return; }
     setPayments([newPayment, ...payments]);
     setShowPaymentDialog(false);
+    setSubmitting(false);
     toast.success("Payment recorded successfully", {
       description: `Receipt ${newPayment.receipt_number} — $${newPayment.amount}`,
     });
+    fetchData();
   };
 
   return (
     <div className="space-y-6">
       <PageHeader title="Fees & Finance" description="Manage student billing, payments, and financial records">
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => {
+          exportToCSV("invoices",
+            ["Invoice #", "Student", "Grade", "Total", "Paid", "Balance", "Status"],
+            invoices.map(i => [i.invoice_number, i.student_name || "", i.grade_name || "", String(i.total_amount), String(i.paid_amount), String(i.balance), i.status]));
+          toast.success("Invoices exported", { description: `${invoices.length} records exported to CSV` });
+        }}>
           <Download className="w-4 h-4 mr-2" /> Export
         </Button>
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
@@ -141,8 +154,8 @@ export default function FeesPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowPaymentDialog(false)}>Cancel</Button>
-                <Button type="submit">Record Payment</Button>
+                <Button type="button" variant="outline" onClick={() => setShowPaymentDialog(false)} disabled={submitting}>Cancel</Button>
+                <Button type="submit" disabled={submitting}>{submitting ? "Processing..." : "Record Payment"}</Button>
               </div>
             </form>
           </DialogContent>
@@ -250,7 +263,10 @@ export default function FeesPage() {
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">{pay.reference_number || "—"}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="w-7 h-7">
+                          <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => {
+                            toast.success("Receipt printed", { description: pay.receipt_number });
+                            window.print();
+                          }}>
                             <Printer className="w-3.5 h-3.5" />
                           </Button>
                         </TableCell>

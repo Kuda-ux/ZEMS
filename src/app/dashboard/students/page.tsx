@@ -23,6 +23,7 @@ import Link from "next/link";
 import type { Student } from "@/lib/types";
 import { GRADES } from "@/lib/constants";
 import { toast } from "sonner";
+import { exportToCSV } from "@/lib/export-utils";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -41,6 +42,7 @@ export default function StudentsPage() {
   const [genderFilter, setGenderFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
@@ -71,6 +73,8 @@ export default function StudentsPage() {
 
   const handleAddStudent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     const form = new FormData(e.currentTarget);
     const newStudent: Student = {
       id: `stu${Date.now()}`,
@@ -96,16 +100,22 @@ export default function StudentsPage() {
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase.from("students").insert(newStudent);
-    if (error) { toast.error("Failed to enroll student", { description: error.message }); return; }
+    if (error) { toast.error("Failed to enroll student", { description: error.message }); setSubmitting(false); return; }
     setStudents([newStudent, ...students]);
     setShowAddDialog(false);
+    setSubmitting(false);
     toast.success("Student enrolled successfully", { description: `${newStudent.first_name} ${newStudent.last_name} — ${newStudent.zems_id}` });
   };
 
   return (
     <div className="space-y-6">
       <PageHeader title="Student Management" description={`${filtered.length} students found`}>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => {
+          exportToCSV("students",
+            ["ZEMS ID", "First Name", "Last Name", "Gender", "Grade", "Status", "Guardian", "Guardian Phone"],
+            filtered.map(s => [s.zems_id, s.first_name, s.last_name, s.gender, s.grade_name || "", s.status, s.guardian_name || "", s.guardian_phone || ""]));
+          toast.success("Students exported", { description: `${filtered.length} records exported to CSV` });
+        }}>
           <Download className="w-4 h-4 mr-2" /> Export
         </Button>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -121,11 +131,11 @@ export default function StudentsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="first_name">First Name *</Label>
-                  <Input id="first_name" name="first_name" required />
+                  <Input id="first_name" name="first_name" placeholder="e.g. Tatenda" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="last_name">Last Name *</Label>
-                  <Input id="last_name" name="last_name" required />
+                  <Input id="last_name" name="last_name" placeholder="e.g. Moyo" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="date_of_birth">Date of Birth *</Label>
@@ -175,7 +185,7 @@ export default function StudentsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="guardian_name">Guardian Name *</Label>
-                    <Input id="guardian_name" name="guardian_name" required />
+                    <Input id="guardian_name" name="guardian_name" placeholder="e.g. John Moyo" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="guardian_phone">Guardian Phone *</Label>
@@ -200,8 +210,10 @@ export default function StudentsPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-                <Button type="submit">Enroll Student</Button>
+                <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)} disabled={submitting}>Cancel</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Enrolling..." : "Enroll Student"}
+                </Button>
               </div>
             </form>
           </DialogContent>
@@ -295,7 +307,9 @@ export default function StudentsPage() {
                             <Eye className="w-3.5 h-3.5" />
                           </Button>
                         </Link>
-                        <Button variant="ghost" size="icon" className="w-7 h-7">
+                        <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => {
+                          toast.info(`Edit ${student.first_name} ${student.last_name}`, { description: "Open student profile to edit details" });
+                        }}>
                           <Edit className="w-3.5 h-3.5" />
                         </Button>
                       </div>

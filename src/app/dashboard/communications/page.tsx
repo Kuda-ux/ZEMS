@@ -45,9 +45,12 @@ export default function CommunicationsPage() {
   }, []);
   useEffect(() => { fetchData(); }, [fetchData]);
   const [showDialog, setShowDialog] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     const form = new FormData(e.currentTarget);
     const newAnn: Announcement = {
       id: `ann${Date.now()}`,
@@ -61,10 +64,11 @@ export default function CommunicationsPage() {
       created_at: new Date().toISOString(),
     };
     const { error } = await supabase.from("announcements").insert(newAnn);
-    if (error) { toast.error("Failed to publish", { description: error.message }); return; }
+    if (error) { toast.error("Failed to publish", { description: error.message }); setSubmitting(false); return; }
     setAnnouncements([newAnn, ...announcements]);
     setShowDialog(false);
-    toast.success("Announcement published");
+    setSubmitting(false);
+    toast.success("Announcement published", { description: newAnn.title });
   };
 
   return (
@@ -82,11 +86,11 @@ export default function CommunicationsPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Title *</Label>
-                <Input id="title" name="title" required />
+                <Input id="title" name="title" placeholder="e.g. School Assembly Notice" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="content">Content *</Label>
-                <Textarea id="content" name="content" rows={4} required />
+                <Textarea id="content" name="content" rows={4} placeholder="Enter announcement details..." required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -115,15 +119,17 @@ export default function CommunicationsPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-                <Button type="submit"><Send className="w-4 h-4 mr-2" /> Publish</Button>
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)} disabled={submitting}>Cancel</Button>
+                <Button type="submit" disabled={submitting}>
+                  <Send className="w-4 h-4 mr-2" /> {submitting ? "Publishing..." : "Publish"}
+                </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </PageHeader>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4 flex items-center gap-3">
             <Megaphone className="w-6 h-6 text-blue-600" />

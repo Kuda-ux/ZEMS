@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollText, Search, Download, Filter } from "lucide-react";
+import { toast } from "sonner";
+import { exportToCSV } from "@/lib/export-utils";
 
 const actionColors: Record<string, string> = {
   create: "bg-emerald-100 text-emerald-800",
@@ -41,7 +43,12 @@ export default function AuditLogsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Audit Logs" description="Track all system activities and changes">
-        <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" /> Export</Button>
+        <Button variant="outline" size="sm" onClick={() => {
+          exportToCSV("audit_logs",
+            ["Timestamp", "User", "Action", "Entity Type", "Entity ID"],
+            filtered.map(l => [new Date(l.created_at).toLocaleString(), l.user_name || "", l.action, l.entity_type, l.entity_id || ""]));
+          toast.success("Audit logs exported", { description: `${filtered.length} records` });
+        }}><Download className="w-4 h-4 mr-2" /> Export</Button>
       </PageHeader>
 
       <Card>

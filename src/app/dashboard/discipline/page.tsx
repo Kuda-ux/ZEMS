@@ -36,6 +36,10 @@ export default function DisciplinePage() {
   const [records, setRecords] = useState<DisciplineRecord[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [showDialog, setShowDialog] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [statusFilterVal, setStatusFilterVal] = useState("all");
 
   const fetchData = useCallback(async () => {
     try {
@@ -47,6 +51,8 @@ export default function DisciplinePage() {
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     const form = new FormData(e.currentTarget);
     const stu = allStudents.find(s => s.id === form.get("student_id"));
     const newRecord: DisciplineRecord = {
@@ -63,9 +69,12 @@ export default function DisciplinePage() {
       status: "open",
       student_name: stu ? `${stu.first_name} ${stu.last_name}` : "Unknown",
     };
+    const { error } = await supabase.from("discipline_records").insert(newRecord);
+    if (error) { toast.error("Failed to record incident", { description: error.message }); setSubmitting(false); return; }
     setRecords([newRecord, ...records]);
     setShowDialog(false);
-    toast.success("Incident recorded");
+    setSubmitting(false);
+    toast.success("Incident recorded", { description: `${newRecord.incident_type} — ${newRecord.student_name}` });
   };
 
   return (
@@ -123,22 +132,22 @@ export default function DisciplinePage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description *</Label>
-                <Textarea id="description" name="description" rows={3} required />
+                <Textarea id="description" name="description" rows={3} placeholder="Describe the incident in detail..." required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="action">Action Taken</Label>
-                <Textarea id="action" name="action" rows={2} />
+                <Textarea id="action" name="action" rows={2} placeholder="e.g. Verbal warning, detention, parent meeting..." />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-                <Button type="submit">Record Incident</Button>
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)} disabled={submitting}>Cancel</Button>
+                <Button type="submit" disabled={submitting}>{submitting ? "Recording..." : "Record Incident"}</Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </PageHeader>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4 flex items-center gap-3">
             <Clock className="w-6 h-6 text-blue-600" />
@@ -170,6 +179,31 @@ export default function DisciplinePage() {
 
       <Card>
         <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Input placeholder="Search by student or incident..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <ShieldAlert className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            </div>
+            <Select value={severityFilter} onValueChange={(v) => v && setSeverityFilter(v)}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Severity" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Severity</SelectItem>
+                <SelectItem value="minor">Minor</SelectItem>
+                <SelectItem value="moderate">Moderate</SelectItem>
+                <SelectItem value="major">Major</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilterVal} onValueChange={(v) => v && setStatusFilterVal(v)}>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="escalated">Escalated</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="rounded-lg border overflow-x-auto">
             <Table>
               <TableHeader>
@@ -183,7 +217,12 @@ export default function DisciplinePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {records.map((r) => (
+                {records.filter(r => {
+                  const matchSearch = search === "" || (r.student_name || "").toLowerCase().includes(search.toLowerCase()) || r.incident_type.toLowerCase().includes(search.toLowerCase());
+                  const matchSeverity = severityFilter === "all" || r.severity === severityFilter;
+                  const matchStatus = statusFilterVal === "all" || r.status === statusFilterVal;
+                  return matchSearch && matchSeverity && matchStatus;
+                }).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="text-sm">{r.date}</TableCell>
                     <TableCell className="font-medium">{r.student_name}</TableCell>

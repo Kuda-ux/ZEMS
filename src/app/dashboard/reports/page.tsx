@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { Download, FileSpreadsheet, FileText, Printer, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { exportToCSV } from "@/lib/export-utils";
 
 const COLORS = ["#166534", "#CA8A04", "#DC2626", "#2563eb", "#7c3aed"];
 
@@ -57,7 +58,14 @@ export default function ReportsPage() {
   ];
 
   const handleExport = (format: string) => {
-    toast.success(`Report exported as ${format}`, { description: "Download will start shortly" });
+    if (format === "Print") { window.print(); return; }
+    exportToCSV(`report_${format.toLowerCase()}`,
+      ["Grade", "Male", "Female", "Total", "BEAM", "Orphans"],
+      ["Form 1", "Form 2", "Form 3", "Form 4"].map(grade => {
+        const gs = students.filter(s => s.grade_name === grade && s.status === "active");
+        return [grade, String(gs.filter(s => s.gender === "male").length), String(gs.filter(s => s.gender === "female").length), String(gs.length), String(gs.filter(s => s.is_beam_beneficiary).length), String(gs.filter(s => s.is_orphan).length)];
+      }));
+    toast.success(`Report exported as ${format}`, { description: "Download started" });
   };
 
   return (

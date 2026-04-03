@@ -29,6 +29,7 @@ export default function AttendancePage() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [streams, setStreams] = useState<Stream[]>([]);
   const [allAttendance, setAllAttendance] = useState<AttendanceRecord[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -70,6 +71,8 @@ export default function AttendancePage() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
     const records = streamStudents.map(s => ({
       id: `att-${selectedDate}-${s.id}`,
       school_id: "sch1",
@@ -81,11 +84,12 @@ export default function AttendancePage() {
       student_name: `${s.first_name} ${s.last_name}`,
     }));
     const { error } = await supabase.from("attendance_records").upsert(records, { onConflict: "id" });
-    if (error) { toast.error("Failed to save", { description: error.message }); return; }
+    if (error) { toast.error("Failed to save", { description: error.message }); setSaving(false); return; }
     toast.success("Attendance saved successfully", {
       description: `${streamStudents.length} records saved for ${selectedDate}`,
     });
-    fetchData();
+    await fetchData();
+    setSaving(false);
   };
 
   const todayRecords = allAttendance.filter(a => a.date === selectedDate);
@@ -97,8 +101,8 @@ export default function AttendancePage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Attendance" description="Mark and manage daily student attendance">
-        <Button onClick={handleSave} size="sm">
-          <Save className="w-4 h-4 mr-2" /> Save Attendance
+        <Button onClick={handleSave} size="sm" disabled={saving}>
+          <Save className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save Attendance"}
         </Button>
       </PageHeader>
 
